@@ -151,12 +151,11 @@ function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, to
       <div className="px-6 pt-10 pb-4 bg-brand-lightBg dark:bg-brand-darkBg sticky top-0 z-10">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 overflow-hidden relative rounded-xl shadow-lg ring-1 ring-black/5 dark:ring-white/10 shrink-0">
+            <div className="w-12 h-12 flex items-center justify-center shrink-0">
               <img
-                src="/logo_variations.png"
+                src={isDarkMode ? "/logo_white.png" : "/logo_black.png"}
                 alt="Split Trip Logo"
-                className={`absolute left-0 top-0 w-full max-w-none transition-transform duration-300 pointer-events-none drop-shadow-sm ${isDarkMode ? '-translate-y-1/2' : 'translate-y-0'}`}
-                style={{ height: '206.6%' }} // 465/225 ratio
+                className="w-full h-full object-contain drop-shadow-sm"
               />
             </div>
             <h1 className="text-2xl font-black tracking-tighter bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">Split Trip</h1>
