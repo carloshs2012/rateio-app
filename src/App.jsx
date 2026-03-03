@@ -58,7 +58,12 @@ export default function App() {
   const [activeRateioId, setActiveRateioId] = useState(null);
 
   useEffect(() => {
-    localStorage.setItem('historico_rateios', JSON.stringify(rateios));
+    try {
+      localStorage.setItem('historico_rateios', JSON.stringify(rateios));
+    } catch (error) {
+      console.error("Erro ao salvar dados locais:", error);
+      alert("Armazenamento cheio! O comprovante ou a quantidade de viagens ultrapassou o limite do seu aparelho.");
+    }
   }, [rateios]);
 
   const [customCategories, setCustomCategories] = useState(() => {
@@ -67,7 +72,11 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('historico_categorias', JSON.stringify(customCategories));
+    try {
+      localStorage.setItem('historico_categorias', JSON.stringify(customCategories));
+    } catch (error) {
+      console.error("Erro ao salvar categorias locais:", error);
+    }
   }, [customCategories]);
 
   if (!activeRateioId) {
@@ -99,6 +108,7 @@ export default function App() {
 // ============================================================================
 function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, toggleTheme }) {
   const [activeTab, setActiveTab] = useState('active');
+  const [globalTab, setGlobalTab] = useState('trips'); // trips | friends | activity | settings
   const [newRateioModal, setNewRateioModal] = useState({ isOpen: false, name: '', date: new Date().toISOString().split('T')[0] });
   const [editRateioModal, setEditRateioModal] = useState({ isOpen: false, id: null, name: '', date: '' });
 
@@ -142,69 +152,82 @@ function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, to
         </div>
 
         {/* TABS */}
-        <div className="flex gap-6 border-b border-slate-200 dark:border-slate-800">
-          <button onClick={() => setActiveTab('active')} className={`pb-2 text-sm font-semibold transition-colors ${activeTab === 'active' ? 'text-brand-green border-b-2 border-brand-green' : 'text-slate-400 dark:text-slate-500'}`}>Ativos</button>
-          <button onClick={() => setActiveTab('past')} className={`pb-2 text-sm font-semibold transition-colors ${activeTab === 'past' ? 'text-brand-green border-b-2 border-brand-green' : 'text-slate-400 dark:text-slate-500'}`}>Passados</button>
-        </div>
+        {globalTab === 'trips' && (
+          <div className="flex gap-6 border-b border-slate-200 dark:border-slate-800">
+            <button onClick={() => setActiveTab('active')} className={`pb-2 text-sm font-semibold transition-colors ${activeTab === 'active' ? 'text-brand-green border-b-2 border-brand-green' : 'text-slate-400 dark:text-slate-500'}`}>Ativos</button>
+            <button onClick={() => setActiveTab('past')} className={`pb-2 text-sm font-semibold transition-colors ${activeTab === 'past' ? 'text-brand-green border-b-2 border-brand-green' : 'text-slate-400 dark:text-slate-500'}`}>Passados</button>
+          </div>
+        )}
+        {globalTab === 'friends' && <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Meus Amigos</h2>}
+        {globalTab === 'activity' && <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Atividade Global</h2>}
+        {globalTab === 'settings' && <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Ajustes</h2>}
       </div>
 
       {/* CONTENT */}
-      <div className="px-6 flex-1 overflow-y-auto">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4">Viagens em Andamento</h2>
+      {globalTab === 'trips' && (
+        <div className="px-6 flex-1 overflow-y-auto">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4">Viagens em Andamento</h2>
 
-        {rateios.length === 0 ? (
-          <div className="text-center py-12">
-            <Receipt size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-4" />
-            <p className="text-slate-500 dark:text-slate-400 text-sm">Ainda não tens rateios.</p>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {rateios.sort((a, b) => new Date(b.date) - new Date(a.date)).map(rateio => {
-              const totalGasto = rateio.expenses.reduce((acc, exp) => acc + exp.amount, 0);
-              return (
-                <div key={rateio.id} className="bg-white dark:bg-brand-darkCard rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 relative group overflow-hidden">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 cursor-pointer" onClick={() => setActiveRateioId(rateio.id)}>
-                      <h3 className="text-lg font-bold">{rateio.name}</h3>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5"><Calendar size={12} /> {new Date(rateio.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
+          {rateios.length === 0 ? (
+            <div className="text-center py-12">
+              <Receipt size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-4" />
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Ainda não tens rateios.</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {rateios.sort((a, b) => new Date(b.date) - new Date(a.date)).map(rateio => {
+                const totalGasto = rateio.expenses.reduce((acc, exp) => acc + exp.amount, 0);
+                return (
+                  <div key={rateio.id} className="bg-white dark:bg-brand-darkCard rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 relative group overflow-hidden">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1 cursor-pointer" onClick={() => setActiveRateioId(rateio.id)}>
+                        <h3 className="text-lg font-bold">{rateio.name}</h3>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5"><Calendar size={12} /> {new Date(rateio.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
+                      </div>
+                      <div className="flex items-center gap-1 z-10">
+                        <button onClick={(e) => { e.stopPropagation(); setEditRateioModal({ isOpen: true, id: rateio.id, name: rateio.name, date: rateio.date }); }} className="text-slate-300 hover:text-brand-green transition-colors p-2 bg-slate-50 dark:bg-brand-darkBg rounded-full"><Edit2 size={16} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteRateio(rateio.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-2 bg-slate-50 dark:bg-brand-darkBg rounded-full"><Trash2 size={16} /></button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 z-10">
-                      <button onClick={(e) => { e.stopPropagation(); setEditRateioModal({ isOpen: true, id: rateio.id, name: rateio.name, date: rateio.date }); }} className="text-slate-300 hover:text-brand-green transition-colors p-2 bg-slate-50 dark:bg-brand-darkBg rounded-full"><Edit2 size={16} /></button>
-                      <button onClick={(e) => { e.stopPropagation(); deleteRateio(rateio.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-2 bg-slate-50 dark:bg-brand-darkBg rounded-full"><Trash2 size={16} /></button>
+
+                    <div className="flex items-end justify-between mb-5">
+                      <div>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Gasto Total</p>
+                        <p className="text-lg font-black font-mono">R$ {totalGasto.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full font-bold">Ativo</p>
+                      </div>
                     </div>
+
+                    <button onClick={() => setActiveRateioId(rateio.id)} className="w-full bg-brand-green/10 hover:bg-brand-green/20 text-brand-green dark:text-[#00D06C] font-bold py-3 rounded-xl transition-colors text-sm">
+                      Ver Detalhes
+                    </button>
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
-                  <div className="flex items-end justify-between mb-5">
-                    <div>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Gasto Total</p>
-                      <p className="text-lg font-black font-mono">R$ {totalGasto.toFixed(2)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full font-bold">Ativo</p>
-                    </div>
-                  </div>
-
-                  <button onClick={() => setActiveRateioId(rateio.id)} className="w-full bg-brand-green/10 hover:bg-brand-green/20 text-brand-green dark:text-[#00D06C] font-bold py-3 rounded-xl transition-colors text-sm">
-                    Ver Detalhes
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {globalTab === 'friends' && <GlobalFriendsScreen rateios={rateios} />}
+      {globalTab === 'activity' && <GlobalActivityScreen rateios={rateios} categories={DEFAULT_CATEGORIES} />}
+      {globalTab === 'settings' && <GlobalSettingsScreen isDarkMode={isDarkMode} toggleTheme={toggleTheme} setRateios={setRateios} />}
 
       {/* FAB - CREATE RATEIO */}
-      <button onClick={() => setNewRateioModal({ ...newRateioModal, isOpen: true })} className="absolute bottom-24 right-6 bg-brand-green w-14 h-14 rounded-full shadow-lg shadow-brand-green/30 flex items-center justify-center text-white hover:bg-brand-greenHover transition-transform active:scale-95">
-        <Plus size={24} />
-      </button>
+      {globalTab === 'trips' && (
+        <button onClick={() => setNewRateioModal({ ...newRateioModal, isOpen: true })} className="absolute bottom-24 right-6 bg-brand-green w-14 h-14 rounded-full shadow-lg shadow-brand-green/30 flex items-center justify-center text-white hover:bg-brand-greenHover transition-transform active:scale-95">
+          <Plus size={24} />
+        </button>
+      )}
 
-      {/* GLOBAL BOTTOM NAV (MOCK) */}
-      <div className="fixed bottom-0 w-full max-w-md bg-white dark:bg-brand-darkCard border-t border-slate-100 dark:border-brand-darkBg px-6 py-4 flex justify-between items-center pb-8 safe-area-pb">
-        <button className="flex flex-col items-center gap-1 text-brand-green"><MapIcon size={22} /><span className="text-[10px] font-bold">Viagens</span></button>
-        <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500"><Users size={22} /><span className="text-[10px] font-bold">Amigos</span></button>
-        <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500"><Activity size={22} /><span className="text-[10px] font-bold">Atividade</span></button>
-        <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500"><Settings size={22} /><span className="text-[10px] font-bold">Ajustes</span></button>
+      {/* GLOBAL BOTTOM NAV */}
+      <div className="fixed bottom-0 w-full max-w-md bg-white dark:bg-brand-darkCard border-t border-slate-100 dark:border-brand-darkBg px-6 flex justify-between items-center pb-8 safe-area-pb z-20 rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-none">
+        <NavBtn icon={<MapIcon size={24} />} label="Viagens" active={globalTab === 'trips'} onClick={() => setGlobalTab('trips')} />
+        <NavBtn icon={<Users size={24} />} label="Amigos" active={globalTab === 'friends'} onClick={() => setGlobalTab('friends')} />
+        <NavBtn icon={<Activity size={24} />} label="Atividade" active={globalTab === 'activity'} onClick={() => setGlobalTab('activity')} />
+        <NavBtn icon={<Settings size={24} />} label="Ajustes" active={globalTab === 'settings'} onClick={() => setGlobalTab('settings')} />
       </div>
 
       {/* CREATE MODAL */}
@@ -481,15 +504,58 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
   const handleReceiptChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('O comprovante deve ter no tamanho máximo de 5MB.');
-        return;
+      if (file.type === 'application/pdf') {
+        if (file.size > 1 * 1024 * 1024) { // 1MB for PDF
+          alert('PDFs não podem ultrapassar 1MB para não lotar o armazenamento do navegador.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setForm(prev => ({ ...prev, receipt: reader.result }));
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Image Compression
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let { width, height } = img;
+            const MAX_DIMENSION = 800; // Resize to reasonable dimensions
+
+            if (width > height) {
+              if (width > MAX_DIMENSION) {
+                height *= MAX_DIMENSION / width;
+                width = MAX_DIMENSION;
+              }
+            } else {
+              if (height > MAX_DIMENSION) {
+                width *= MAX_DIMENSION / height;
+                height = MAX_DIMENSION;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Compress to JPEG with 0.6 quality to save space
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+
+            // Validate size (rough base64 approx)
+            if (compressedBase64.length > 500 * 1024) { // Roughly 500KB 
+              alert('A imagem é muito grande mesmo após compressão. Escolha outra.');
+              return; // Avoid saving and crashing
+            }
+
+            setForm(prev => ({ ...prev, receipt: compressedBase64 }));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setForm(prev => ({ ...prev, receipt: reader.result }));
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -1163,6 +1229,116 @@ function GroupSettingsScreen({ rateio, updateRateio, historicNames }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================================
+// TELA GLOBAL: AMIGOS
+// ============================================================================
+function GlobalFriendsScreen({ rateios }) {
+  const friends = Array.from(new Set(rateios.flatMap(r => r.participants?.map(p => p.name) || []))).sort();
+
+  return (
+    <div className="px-6 flex-1 overflow-y-auto pb-28">
+      {friends.length === 0 ? (
+        <div className="text-center py-12">
+          <Users size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-4" />
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Ainda não tens amigos registados.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {friends.map(name => (
+            <div key={name} className="bg-white dark:bg-brand-darkCard p-4 rounded-2xl shadow-sm border border-slate-50 dark:border-slate-800 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold uppercase">
+                {name.substring(0, 2)}
+              </div>
+              <span className="font-bold text-sm">{name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// TELA GLOBAL: ATIVIDADE
+// ============================================================================
+function GlobalActivityScreen({ rateios, categories }) {
+  const allExpenses = rateios.flatMap(r =>
+    (r.expenses || []).map(e => ({ ...e, rateioName: r.name, payerName: r.participants.find(p => p.id === e.payerId)?.name || 'Alguém' }))
+  ).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return (
+    <div className="px-6 flex-1 overflow-y-auto pb-28">
+      {allExpenses.length === 0 ? (
+        <div className="text-center py-12">
+          <Activity size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-4" />
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Sem atividade recente.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {allExpenses.map(e => {
+            const catStyle = categories[e.category || 'Outros'] || { icon: 'Tag', color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-500/10' };
+            const CatIcon = IconMap[catStyle.icon] || Tag;
+
+            return (
+              <div key={`${e.id}-${e.rateioName}`} className="flex items-center justify-between bg-white dark:bg-brand-darkCard p-4 rounded-2xl shadow-sm border border-slate-50 dark:border-slate-800">
+                <div className="flex items-center gap-3 w-full pr-16">
+                  <div className={`p-2.5 rounded-xl ${catStyle.bg} ${catStyle.color} shrink-0`}><CatIcon size={18} /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-sm truncate">{e.description || e.category}</p>
+                    <p className="text-xs text-slate-400 mt-0.5 truncate"><span className="font-semibold">{e.payerName}</span> em {e.rateioName}</p>
+                  </div>
+                </div>
+                <span className="font-mono font-black text-sm shrink-0">R$ {e.amount.toFixed(2)}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// TELA GLOBAL: AJUSTES
+// ============================================================================
+function GlobalSettingsScreen({ isDarkMode, toggleTheme, setRateios }) {
+  const handleClearData = () => {
+    if (window.confirm("ATENÇÃO! Isto vai apagar TODAS as tuas viagens e dados. Desejas continuar?")) {
+      setRateios([]);
+      localStorage.removeItem('historico_rateios');
+      localStorage.removeItem('historico_categorias');
+      window.location.reload();
+    }
+  };
+
+  return (
+    <div className="px-6 flex-1 overflow-y-auto space-y-6 pb-28">
+      <div className="bg-white dark:bg-brand-darkCard rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-brand-green/10 text-brand-green rounded-xl"><Moon size={20} /></div>
+            <div>
+              <h3 className="font-bold text-sm">Modo Escuro</h3>
+              <p className="text-xs text-slate-400">Alternar tema da aplicação</p>
+            </div>
+          </div>
+          <button onClick={toggleTheme} className={`w-12 h-6 rounded-full p-1 transition-colors ${isDarkMode ? 'bg-brand-green' : 'bg-slate-200 dark:bg-slate-700'}`}>
+            <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform ${isDarkMode ? 'translate-x-6' : 'translate-x-0'}`} />
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-brand-darkCard rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 space-y-4">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Perigo</h3>
+        <button onClick={handleClearData} className="w-full flex items-center justify-between p-3 rounded-2xl bg-red-50 dark:bg-red-500/10 text-red-500 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors">
+          <span className="font-bold text-sm">Apagar Todos os Dados</span>
+          <Trash2 size={18} />
+        </button>
+      </div>
     </div>
   );
 }
