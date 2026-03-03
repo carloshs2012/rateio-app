@@ -3,7 +3,7 @@ import {
   Plus, Users, Settings, Receipt, ArrowLeft, ArrowRight,
   UserPlus, Utensils, Car, Home, Map as MapIcon, ShoppingCart, Tag,
   Sun, Moon, Wallet, User, Check, X, Calendar, Edit2, Trash2, Heart,
-  PieChart, Activity, Plane, Coffee, Ticket, ShoppingBag, Fuel, PlusCircle, Share2, Copy
+  PieChart, Activity, Plane, Coffee, Ticket, ShoppingBag, Fuel, PlusCircle, Share2, Copy, Archive
 } from 'lucide-react';
 
 const IconMap = { Utensils, Car, Home, MapIcon, ShoppingCart, Tag, Plane, Coffee, Ticket, ShoppingBag, Fuel };
@@ -121,7 +121,8 @@ function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, to
       date: newRateioModal.date,
       participants: [],
       expenses: [],
-      centralizerId: null
+      centralizerId: null,
+      isFinished: false
     };
     setRateios([...rateios, newRateio]);
     setNewRateioModal({ isOpen: false, name: '', date: new Date().toISOString().split('T')[0] });
@@ -129,9 +130,18 @@ function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, to
   };
 
   const deleteRateio = (id) => {
-    if (window.confirm("Confirmar exclusão deste rateio?")) {
+    if (window.confirm("Confirmar exclusão desta viagem?")) {
       setRateios(rateios.filter(r => r.id !== id));
     }
+  };
+
+  const toggleFinishRateio = (id) => {
+    setRateios(rateios.map(r => {
+      if (r.id === id) {
+        return { ...r, isFinished: !r.isFinished };
+      }
+      return r;
+    }));
   };
 
   return (
@@ -166,48 +176,59 @@ function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, to
       {/* CONTENT */}
       {globalTab === 'trips' && (
         <div className="px-6 flex-1 overflow-y-auto">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4">Viagens em Andamento</h2>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4">
+            {activeTab === 'active' ? 'Viagens em Andamento' : 'Viagens Passadas'}
+          </h2>
 
-          {rateios.length === 0 ? (
-            <div className="text-center py-12">
-              <Receipt size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-4" />
-              <p className="text-slate-500 dark:text-slate-400 text-sm">Ainda não tens rateios.</p>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {rateios.sort((a, b) => new Date(b.date) - new Date(a.date)).map(rateio => {
-                const totalGasto = rateio.expenses.reduce((acc, exp) => acc + exp.amount, 0);
-                return (
-                  <div key={rateio.id} className="bg-white dark:bg-brand-darkCard rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 relative group overflow-hidden">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1 cursor-pointer" onClick={() => setActiveRateioId(rateio.id)}>
-                        <h3 className="text-lg font-bold">{rateio.name}</h3>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5"><Calendar size={12} /> {new Date(rateio.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
+          {(() => {
+            const displayed = rateios.filter(r => activeTab === 'active' ? !r.isFinished : r.isFinished);
+            if (displayed.length === 0) {
+              return (
+                <div className="text-center py-12">
+                  <Receipt size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-4" />
+                  <p className="text-slate-500 dark:text-slate-400 text-sm">Nenhuma viagem {activeTab === 'active' ? 'em andamento' : 'passada'}.</p>
+                </div>
+              );
+            }
+            return (
+              <div className="space-y-5">
+                {displayed.sort((a, b) => new Date(b.date) - new Date(a.date)).map(rateio => {
+                  const totalGasto = rateio.expenses.reduce((acc, exp) => acc + exp.amount, 0);
+                  return (
+                    <div key={rateio.id} className="bg-white dark:bg-brand-darkCard rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 relative group overflow-hidden">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1 cursor-pointer" onClick={() => setActiveRateioId(rateio.id)}>
+                          <h3 className="text-lg font-bold">{rateio.name}</h3>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5"><Calendar size={12} /> {new Date(rateio.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
+                        </div>
+                        <div className="flex items-center gap-1 z-10">
+                          <button onClick={(e) => { e.stopPropagation(); toggleFinishRateio(rateio.id); }} className="text-slate-300 hover:text-brand-green transition-colors p-2 bg-slate-50 dark:bg-brand-darkBg rounded-full" title={rateio.isFinished ? "Reativar viagem" : "Encerrar viagem"}><Archive size={16} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); setEditRateioModal({ isOpen: true, id: rateio.id, name: rateio.name, date: rateio.date }); }} className="text-slate-300 hover:text-brand-green transition-colors p-2 bg-slate-50 dark:bg-brand-darkBg rounded-full"><Edit2 size={16} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); deleteRateio(rateio.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-2 bg-slate-50 dark:bg-brand-darkBg rounded-full"><Trash2 size={16} /></button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 z-10">
-                        <button onClick={(e) => { e.stopPropagation(); setEditRateioModal({ isOpen: true, id: rateio.id, name: rateio.name, date: rateio.date }); }} className="text-slate-300 hover:text-brand-green transition-colors p-2 bg-slate-50 dark:bg-brand-darkBg rounded-full"><Edit2 size={16} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteRateio(rateio.id); }} className="text-slate-300 hover:text-red-500 transition-colors p-2 bg-slate-50 dark:bg-brand-darkBg rounded-full"><Trash2 size={16} /></button>
+
+                      <div className="flex items-end justify-between mb-5">
+                        <div>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Gasto Total</p>
+                          <p className="text-lg font-black font-mono">R$ {totalGasto.toFixed(2)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-xs px-2 py-0.5 rounded-full font-bold ${rateio.isFinished ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' : 'text-brand-green bg-brand-green/10'}`}>
+                            {rateio.isFinished ? 'Encerrada' : 'Ativa'}
+                          </p>
+                        </div>
                       </div>
+
+                      <button onClick={() => setActiveRateioId(rateio.id)} className="w-full bg-brand-green/10 hover:bg-brand-green/20 text-brand-green dark:text-[#00D06C] font-bold py-3 rounded-xl transition-colors text-sm">
+                        Ver Detalhes
+                      </button>
                     </div>
-
-                    <div className="flex items-end justify-between mb-5">
-                      <div>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Gasto Total</p>
-                        <p className="text-lg font-black font-mono">R$ {totalGasto.toFixed(2)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full font-bold">Ativo</p>
-                      </div>
-                    </div>
-
-                    <button onClick={() => setActiveRateioId(rateio.id)} className="w-full bg-brand-green/10 hover:bg-brand-green/20 text-brand-green dark:text-[#00D06C] font-bold py-3 rounded-xl transition-colors text-sm">
-                      Ver Detalhes
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
