@@ -66,18 +66,26 @@ export default function App() {
     }
   }, [rateios]);
 
-  const [customCategories, setCustomCategories] = useState(() => {
+  const [categories, setCategories] = useState(() => {
     const saved = localStorage.getItem('historico_categorias');
-    return saved ? JSON.parse(saved) : {};
+    if (!saved) return DEFAULT_CATEGORIES;
+    try {
+      const parsed = JSON.parse(saved);
+      // Se estiver vazio por algum motivo, restaura padrões
+      if (Object.keys(parsed).length === 0) return DEFAULT_CATEGORIES;
+      return parsed;
+    } catch (e) {
+      return DEFAULT_CATEGORIES;
+    }
   });
 
   useEffect(() => {
     try {
-      localStorage.setItem('historico_categorias', JSON.stringify(customCategories));
+      localStorage.setItem('historico_categorias', JSON.stringify(categories));
     } catch (error) {
       console.error("Erro ao salvar categorias locais:", error);
     }
-  }, [customCategories]);
+  }, [categories]);
 
   if (!activeRateioId) {
     return (
@@ -87,6 +95,7 @@ export default function App() {
         setActiveRateioId={setActiveRateioId}
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
+        categories={categories}
       />
     );
   }
@@ -97,8 +106,8 @@ export default function App() {
       setRateios={setRateios}
       activeRateioId={activeRateioId}
       goBack={() => setActiveRateioId(null)}
-      customCategories={customCategories}
-      setCustomCategories={setCustomCategories}
+      categories={categories}
+      setCategories={setCategories}
     />
   );
 }
@@ -106,7 +115,7 @@ export default function App() {
 // ============================================================================
 // ECRÃ: LISTA DE RATEIOS (Visão Global)
 // ============================================================================
-function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, toggleTheme }) {
+function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, toggleTheme, categories }) {
   const [activeTab, setActiveTab] = useState('active');
   const [globalTab, setGlobalTab] = useState('trips'); // trips | friends | activity | settings
   const [newRateioModal, setNewRateioModal] = useState({ isOpen: false, name: '', date: new Date().toISOString().split('T')[0] });
@@ -237,7 +246,7 @@ function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, to
       )}
 
       {globalTab === 'friends' && <GlobalFriendsScreen rateios={rateios} />}
-      {globalTab === 'activity' && <GlobalActivityScreen rateios={rateios} categories={DEFAULT_CATEGORIES} />}
+      {globalTab === 'activity' && <GlobalActivityScreen rateios={rateios} categories={categories} />}
       {globalTab === 'settings' && <GlobalSettingsScreen isDarkMode={isDarkMode} toggleTheme={toggleTheme} setRateios={setRateios} />}
 
       {/* FAB - CREATE RATEIO */}
@@ -316,20 +325,12 @@ function AllTripsScreen({ rateios, setRateios, setActiveRateioId, isDarkMode, to
 // ============================================================================
 // ESCOPO INTERNO DO RATEIO (Gerencia Navegação Interna do Rateio)
 // ============================================================================
-function TripScope({ rateios, setRateios, activeRateioId, goBack, customCategories, setCustomCategories }) {
+function TripScope({ rateios, setRateios, activeRateioId, goBack, categories, setCategories }) {
   const [currentTab, setCurrentTab] = useState('dashboard'); // dashboard | activity | balances | group
   const [isAddingExpense, setIsAddingExpense] = useState(false);
 
   const currentRateioIndex = rateios.findIndex(r => r.id === activeRateioId);
   const rateio = rateios[currentRateioIndex] || { expenses: [], participants: [] };
-
-  const categories = useMemo(() => {
-    const merged = { ...DEFAULT_CATEGORIES };
-    Object.entries(customCategories).forEach(([name, def]) => {
-      merged[name] = def;
-    });
-    return merged;
-  }, [customCategories]);
 
   const updateCurrentRateio = (updatedData) => {
     const newRateios = [...rateios];
@@ -357,8 +358,7 @@ function TripScope({ rateios, setRateios, activeRateioId, goBack, customCategori
           onClose={() => setIsAddingExpense(false)}
           updateRateio={updateCurrentRateio}
           categories={categories}
-          customCategories={customCategories}
-          setCustomCategories={setCustomCategories}
+          setCategories={setCategories}
         />
       ) : (
         <>
@@ -511,7 +511,7 @@ function TripDashboard({ rateio, totalExpenses, onAdd, onEditExpense, onSettle, 
 // ============================================================================
 // TELA: ADICIONAR DESPESA (FULL SCREEN MODAL)
 // ============================================================================
-function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categories, customCategories, setCustomCategories }) {
+function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categories, setCategories }) {
   const participants = rateio.participants || [];
   const [form, setForm] = useState(initialExpense || {
     amount: '',
@@ -525,6 +525,24 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
   const [showNewCatModal, setShowNewCatModal] = useState(false);
   const [showCategorySelectModal, setShowCategorySelectModal] = useState(false);
   const [newCatName, setNewCatName] = useState('');
+  const [editingCatOldName, setEditingCatOldName] = useState(null);
+  const [newCatIcon, setNewCatIcon] = useState('Tag');
+  const [newCatColor, setNewCatColor] = useState('text-slate-500');
+
+  const AVAILABLE_ICONS = ['Tag', 'Utensils', 'Car', 'Home', 'MapIcon', 'ShoppingCart', 'Plane', 'Coffee', 'Ticket', 'ShoppingBag', 'Fuel', 'Heart', 'Wallet', 'User', 'PieChart', 'Activity', 'Coffee'];
+  const AVAILABLE_COLORS = [
+    { text: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-500/10' },
+    { text: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-500/10' },
+    { text: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-500/10' },
+    { text: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-500/10' },
+    { text: 'text-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-500/10' },
+    { text: 'text-sky-500', bg: 'bg-sky-100 dark:bg-sky-500/10' },
+    { text: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-500/10' },
+    { text: 'text-amber-700', bg: 'bg-amber-100 dark:bg-amber-500/10' },
+    { text: 'text-pink-500', bg: 'bg-pink-100 dark:bg-pink-500/10' },
+    { text: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-500/10' },
+    { text: 'text-red-500', bg: 'bg-red-100 dark:bg-red-500/10' },
+  ];
 
   const handleReceiptChange = (e) => {
     const file = e.target.files?.[0];
@@ -614,25 +632,36 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
 
   const handleDeleteCategory = (catName, e) => {
     e.stopPropagation();
+    if (Object.keys(categories).length <= 1) {
+      alert("Não é possível apagar a última categoria.");
+      return;
+    }
     if (!window.confirm(`Tens a certeza que queres apagar a categoria "${catName}"? Os gastos associados passarão para "Outros".`)) return;
 
-    const newCustom = { ...customCategories };
-    delete newCustom[catName];
-    setCustomCategories(newCustom);
+    const newCats = { ...categories };
+    delete newCats[catName];
+
+    // Se apagou a categoria usada como backup (Outros), tenta pegar a primeira disponível
+    const fallback = newCats['Outros'] ? 'Outros' : Object.keys(newCats)[0];
+
+    setCategories(newCats);
 
     // Sync expenses
     const updatedExpenses = (rateio.expenses || []).map(exp =>
-      exp.category === catName ? { ...exp, category: 'Outros' } : exp
+      exp.category === catName ? { ...exp, category: fallback } : exp
     );
     updateRateio({ expenses: updatedExpenses });
 
-    if (form.category === catName) setForm({ ...form, category: 'Outros' });
+    if (form.category === catName) setForm({ ...form, category: fallback });
   };
 
   const handleEditCategoryStart = (catName, e) => {
     e.stopPropagation();
+    const cat = categories[catName];
     setEditingCatOldName(catName);
     setNewCatName(catName);
+    setNewCatIcon(cat.icon || 'Tag');
+    setNewCatColor(cat.color || 'text-slate-500');
     setShowCategorySelectModal(false);
     setShowNewCatModal(true);
   };
@@ -640,24 +669,22 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
   const handleSaveCategory = () => {
     if (!newCatName.trim()) return;
     const name = newCatName.trim();
+    const colorObj = AVAILABLE_COLORS.find(c => c.text === newCatColor) || AVAILABLE_COLORS[0];
+
+    const newStyle = {
+      icon: newCatIcon,
+      color: newCatColor,
+      bg: colorObj.bg
+    };
 
     if (editingCatOldName) {
       // Editar
-      if (editingCatOldName === name) {
-        setShowNewCatModal(false);
-        setEditingCatOldName(null);
-        setNewCatName('');
-        return;
-      }
+      const newCats = { ...categories };
+      delete newCats[editingCatOldName];
+      newCats[name] = newStyle;
+      setCategories(newCats);
 
-      const newCustom = { ...customCategories };
-      const catStyle = newCustom[editingCatOldName];
-      delete newCustom[editingCatOldName];
-      newCustom[name] = catStyle;
-      setCustomCategories(newCustom);
-
-      // Sync expenses em TODOS os rateios? No plano dizemos no atual, mas customCategories é global.
-      // Vamos assumir sincronização no rateio atual para consistência da UI.
+      // Sync expenses
       const updatedExpenses = (rateio.expenses || []).map(exp =>
         exp.category === editingCatOldName ? { ...exp, category: name } : exp
       );
@@ -667,12 +694,14 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
       setEditingCatOldName(null);
     } else {
       // Novo
-      setCustomCategories({ ...customCategories, [name]: { icon: 'Tag', color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-500/10' } });
+      setCategories({ ...categories, [name]: newStyle });
       setForm({ ...form, category: name });
     }
 
     setShowNewCatModal(false);
     setNewCatName('');
+    setNewCatIcon('Tag');
+    setNewCatColor('text-slate-500');
   };
 
   if (participants.length === 0) {
@@ -794,20 +823,56 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
       {showNewCatModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 min-h-[100dvh]" onClick={() => { setShowNewCatModal(false); setEditingCatOldName(null); setNewCatName(''); }}>
           <div className="bg-white dark:bg-brand-darkCard w-full max-w-sm rounded-[32px] p-6 shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-4">{editingCatOldName ? 'Editar Categoria' : 'Nova Categoria Pessoal'}</h3>
-            <input
-              autoFocus
-              placeholder="Ex: Lavandaria"
-              className="w-full bg-slate-50 dark:bg-brand-darkBg border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-green outline-none mb-6"
-              value={newCatName}
-              onChange={e => setNewCatName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSaveCategory();
-                }
-              }}
-            />
+            <h3 className="text-lg font-bold mb-4">{editingCatOldName ? 'Editar Categoria' : 'Nova Categoria'}</h3>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Nome</label>
+                <input
+                  autoFocus
+                  placeholder="Ex: Lavandaria"
+                  className="w-full bg-slate-50 dark:bg-brand-darkBg border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-green outline-none"
+                  value={newCatName}
+                  onChange={e => setNewCatName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveCategory(); } }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Ícone</label>
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 custom-scrollbar">
+                  {AVAILABLE_ICONS.map(iconName => {
+                    const Icon = IconMap[iconName] || Tag;
+                    return (
+                      <button
+                        key={iconName}
+                        type="button"
+                        onClick={() => setNewCatIcon(iconName)}
+                        className={`p-2.5 rounded-xl border-2 transition-all ${newCatIcon === iconName ? 'border-brand-green bg-brand-green/10 text-brand-green' : 'border-transparent bg-slate-50 dark:bg-slate-800 text-slate-400'}`}
+                      >
+                        <Icon size={18} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Cor</label>
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABLE_COLORS.map(color => (
+                    <button
+                      key={color.text}
+                      type="button"
+                      onClick={() => setNewCatColor(color.text)}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${newCatColor === color.text ? 'border-slate-800 dark:border-white scale-110' : 'border-transparent shadow-inner'}`}
+                      style={{ backgroundColor: color.text.includes('slate') ? '#64748b' : color.text.includes('orange') ? '#f97316' : color.text.includes('blue') ? '#3b82f6' : color.text.includes('purple') ? '#a855f7' : color.text.includes('emerald') ? '#10b981' : color.text.includes('sky') ? '#0ea5e9' : color.text.includes('yellow') ? '#eab308' : color.text.includes('amber') ? '#d97706' : color.text.includes('pink') ? '#ec4899' : color.text.includes('indigo') ? '#6366f1' : '#ef4444' }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <button onClick={() => { setShowNewCatModal(false); setEditingCatOldName(null); setNewCatName(''); }} type="button" className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors">Cancelar</button>
               <button
@@ -854,8 +919,6 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
               {Object.entries(categories).map(([catName, catStyle]) => {
                 const CatIcon = IconMap[catStyle.icon] || Tag;
                 const isSelected = form.category === catName;
-                const isCustom = customCategories[catName];
-
                 return (
                   <button
                     key={catName}
@@ -872,16 +935,12 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
                     <span className={`font-bold text-sm flex-1 text-left ${isSelected ? 'text-brand-green' : 'text-slate-800 dark:text-white'}`}>{catName}</span>
 
                     <div className="flex items-center gap-2">
-                      {isCustom && (
-                        <>
-                          <div onClick={(e) => handleEditCategoryStart(catName, e)} className="p-2 text-slate-300 hover:text-brand-green hover:bg-brand-green/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-                            <Edit2 size={16} />
-                          </div>
-                          <div onClick={(e) => handleDeleteCategory(catName, e)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-                            <Trash2 size={16} />
-                          </div>
-                        </>
-                      )}
+                      <div onClick={(e) => handleEditCategoryStart(catName, e)} className="p-2 text-slate-300 hover:text-brand-green hover:bg-brand-green/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                        <Edit2 size={16} />
+                      </div>
+                      <div onClick={(e) => handleDeleteCategory(catName, e)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                        <Trash2 size={16} />
+                      </div>
                       {isSelected && <div className="w-6 h-6 rounded-full bg-brand-green flex items-center justify-center text-white shrink-0"><Check size={14} /></div>}
                     </div>
                   </button>
