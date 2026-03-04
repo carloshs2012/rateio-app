@@ -945,6 +945,16 @@ function BalancesScreen({ rateio, totalExpenses, updateRateio }) {
       });
     }
 
+    if (expenses.length > 0) {
+      text += `\n📑 *Detalhamento dos Gastos:*\n`;
+      const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
+      sortedExpenses.forEach(e => {
+        const payer = participants.find(p => p.id === e.payerId)?.name || 'Alguém';
+        const dateStr = new Date(e.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        text += `- ${dateStr} ${payer}: ${e.description || e.category} - R$ ${e.amount.toFixed(2)}\n`;
+      });
+    }
+
     if (navigator.share) {
       try { await navigator.share({ title: 'Acertos da Viagem', text }); } catch (err) { }
     } else {
