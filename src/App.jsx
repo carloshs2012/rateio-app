@@ -527,27 +527,21 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
   const [newCatName, setNewCatName] = useState('');
 
   const handleReceiptChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
       if (file.type === 'application/pdf') {
-        if (file.size > 1 * 1024 * 1024) { // 1MB for PDF
-          alert('PDFs não podem ultrapassar 1MB para não lotar o armazenamento do navegador.');
-          return;
-        }
         const reader = new FileReader();
-        reader.onloadend = () => {
-          setForm(prev => ({ ...prev, receipt: reader.result }));
-        };
+        reader.onloadend = () => setForm(prev => ({ ...prev, receipt: reader.result }));
         reader.readAsDataURL(file);
       } else {
-        // Image Compression
         const reader = new FileReader();
         reader.onloadend = () => {
           const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            let { width, height } = img;
-            const MAX_DIMENSION = 800; // Resize to reasonable dimensions
+            const MAX_DIMENSION = 1200;
+            let width = img.width;
+            let height = img.height;
 
             if (width > height) {
               if (width > MAX_DIMENSION) {
@@ -566,13 +560,11 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
 
-            // Compress to JPEG with 0.6 quality to save space
             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
-            // Validate size (rough base64 approx)
-            if (compressedBase64.length > 500 * 1024) { // Roughly 500KB 
+            if (compressedBase64.length > 500 * 1024) {
               alert('A imagem é muito grande mesmo após compressão. Escolha outra.');
-              return; // Avoid saving and crashing
+              return;
             }
 
             setForm(prev => ({ ...prev, receipt: compressedBase64 }));
@@ -620,6 +612,69 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
     onClose();
   };
 
+  const handleDeleteCategory = (catName, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Tens a certeza que queres apagar a categoria "${catName}"? Os gastos associados passarão para "Outros".`)) return;
+
+    const newCustom = { ...customCategories };
+    delete newCustom[catName];
+    setCustomCategories(newCustom);
+
+    // Sync expenses
+    const updatedExpenses = (rateio.expenses || []).map(exp =>
+      exp.category === catName ? { ...exp, category: 'Outros' } : exp
+    );
+    updateRateio({ expenses: updatedExpenses });
+
+    if (form.category === catName) setForm({ ...form, category: 'Outros' });
+  };
+
+  const handleEditCategoryStart = (catName, e) => {
+    e.stopPropagation();
+    setEditingCatOldName(catName);
+    setNewCatName(catName);
+    setShowCategorySelectModal(false);
+    setShowNewCatModal(true);
+  };
+
+  const handleSaveCategory = () => {
+    if (!newCatName.trim()) return;
+    const name = newCatName.trim();
+
+    if (editingCatOldName) {
+      // Editar
+      if (editingCatOldName === name) {
+        setShowNewCatModal(false);
+        setEditingCatOldName(null);
+        setNewCatName('');
+        return;
+      }
+
+      const newCustom = { ...customCategories };
+      const catStyle = newCustom[editingCatOldName];
+      delete newCustom[editingCatOldName];
+      newCustom[name] = catStyle;
+      setCustomCategories(newCustom);
+
+      // Sync expenses em TODOS os rateios? No plano dizemos no atual, mas customCategories é global.
+      // Vamos assumir sincronização no rateio atual para consistência da UI.
+      const updatedExpenses = (rateio.expenses || []).map(exp =>
+        exp.category === editingCatOldName ? { ...exp, category: name } : exp
+      );
+      updateRateio({ expenses: updatedExpenses });
+
+      if (form.category === editingCatOldName) setForm({ ...form, category: name });
+      setEditingCatOldName(null);
+    } else {
+      // Novo
+      setCustomCategories({ ...customCategories, [name]: { icon: 'Tag', color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-500/10' } });
+      setForm({ ...form, category: name });
+    }
+
+    setShowNewCatModal(false);
+    setNewCatName('');
+  };
+
   if (participants.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
@@ -636,7 +691,7 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
       {/* Header Modal */}
       <div className="px-6 pt-10 pb-4 flex justify-between items-center sticky top-0 bg-brand-lightBg dark:bg-brand-darkBg z-10">
         <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center bg-white dark:bg-brand-darkCard text-slate-500"><X size={20} /></button>
-        <h2 className="font-bold text-sm uppercase tracking-widest text-slate-400">Nova Despesa</h2>
+        <h2 className="font-bold text-sm uppercase tracking-widest text-slate-400">{initialExpense ? 'Editar Despesa' : 'Nova Despesa'}</h2>
         <button onClick={handleSave} className="w-10 h-10 rounded-full flex items-center justify-center bg-brand-green/10 text-brand-green"><Check size={20} /></button>
       </div>
 
@@ -735,11 +790,11 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
         </button>
       </div>
 
-      {/* MODAL NOVA CATEGORIA */}
+      {/* MODAL NOVA/EDITAR CATEGORIA */}
       {showNewCatModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 min-h-[100dvh]" onClick={() => setShowNewCatModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 min-h-[100dvh]" onClick={() => { setShowNewCatModal(false); setEditingCatOldName(null); setNewCatName(''); }}>
           <div className="bg-white dark:bg-brand-darkCard w-full max-w-sm rounded-[32px] p-6 shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-4">Nova Categoria Pessoal</h3>
+            <h3 className="text-lg font-bold mb-4">{editingCatOldName ? 'Editar Categoria' : 'Nova Categoria Pessoal'}</h3>
             <input
               autoFocus
               placeholder="Ex: Lavandaria"
@@ -749,30 +804,18 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  if (!newCatName.trim()) return;
-                  const name = newCatName.trim();
-                  setCustomCategories({ ...customCategories, [name]: { icon: 'Tag', color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-500/10' } });
-                  setForm({ ...form, category: name });
-                  setShowNewCatModal(false);
-                  setNewCatName('');
+                  handleSaveCategory();
                 }
               }}
             />
             <div className="flex gap-2">
-              <button onClick={() => setShowNewCatModal(false)} type="button" className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors">Cancelar</button>
+              <button onClick={() => { setShowNewCatModal(false); setEditingCatOldName(null); setNewCatName(''); }} type="button" className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors">Cancelar</button>
               <button
                 type="button"
-                onClick={() => {
-                  if (!newCatName.trim()) return;
-                  const name = newCatName.trim();
-                  setCustomCategories({ ...customCategories, [name]: { icon: 'Tag', color: 'text-purple-500', bg: 'bg-purple-100 dark:bg-purple-500/10' } });
-                  setForm({ ...form, category: name });
-                  setShowNewCatModal(false);
-                  setNewCatName('');
-                }}
+                onClick={handleSaveCategory}
                 className="flex-1 bg-brand-green text-white font-bold py-3 rounded-xl hover:bg-brand-greenHover transition-colors"
               >
-                Adicionar
+                {editingCatOldName ? 'Guardar' : 'Adicionar'}
               </button>
             </div>
           </div>
@@ -811,6 +854,8 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
               {Object.entries(categories).map(([catName, catStyle]) => {
                 const CatIcon = IconMap[catStyle.icon] || Tag;
                 const isSelected = form.category === catName;
+                const isCustom = customCategories[catName];
+
                 return (
                   <button
                     key={catName}
@@ -819,13 +864,26 @@ function AddExpenseScreen({ rateio, initialExpense, onClose, updateRateio, categ
                       setForm({ ...form, category: catName });
                       setShowCategorySelectModal(false);
                     }}
-                    className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all active:scale-95 ${isSelected ? 'bg-white dark:bg-brand-darkCard border-2 border-brand-green shadow-md' : 'bg-white/50 dark:bg-brand-darkCard/50 border-2 border-transparent hover:bg-white dark:hover:bg-brand-darkCard'}`}
+                    className={`group w-full flex items-center gap-4 p-4 rounded-2xl transition-all active:scale-95 ${isSelected ? 'bg-white dark:bg-brand-darkCard border-2 border-brand-green shadow-md' : 'bg-white/50 dark:bg-brand-darkCard/50 border-2 border-transparent hover:bg-white dark:hover:bg-brand-darkCard'}`}
                   >
                     <div className={`p-3 rounded-xl ${catStyle.bg} ${catStyle.color} shrink-0`}>
                       <CatIcon size={20} />
                     </div>
                     <span className={`font-bold text-sm flex-1 text-left ${isSelected ? 'text-brand-green' : 'text-slate-800 dark:text-white'}`}>{catName}</span>
-                    {isSelected && <div className="w-6 h-6 rounded-full bg-brand-green flex items-center justify-center text-white shrink-0"><Check size={14} /></div>}
+
+                    <div className="flex items-center gap-2">
+                      {isCustom && (
+                        <>
+                          <div onClick={(e) => handleEditCategoryStart(catName, e)} className="p-2 text-slate-300 hover:text-brand-green hover:bg-brand-green/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                            <Edit2 size={16} />
+                          </div>
+                          <div onClick={(e) => handleDeleteCategory(catName, e)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                            <Trash2 size={16} />
+                          </div>
+                        </>
+                      )}
+                      {isSelected && <div className="w-6 h-6 rounded-full bg-brand-green flex items-center justify-center text-white shrink-0"><Check size={14} /></div>}
+                    </div>
                   </button>
                 );
               })}
